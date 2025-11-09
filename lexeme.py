@@ -12,7 +12,7 @@ class TokenType:
     ARAYKO = "arayko"
     
     # Control Flow
-    KUNGZ = "kungz"
+    KUNG = "kung"
     KUNGDIMAN = "kungdiman"
     EDIWOW = "ediwow"
     ETOSAYO = "etosayo"
@@ -130,7 +130,7 @@ class LexicalAnalyzer:
         "grupo": TokenType.GRUPO,
         "imbento": TokenType.IMBENTO,
         "arayko": TokenType.ARAYKO,
-        "kungz": TokenType.KUNGZ,
+        "kung": TokenType.KUNG,
         "kungdiman": TokenType.KUNGDIMAN,
         "ediwow": TokenType.EDIWOW,
         "etosayo": TokenType.ETOSAYO,
@@ -149,6 +149,7 @@ class LexicalAnalyzer:
         "print": TokenType.PRINT,
         "anoboi": TokenType.ANOBOI,
         "iba": TokenType.IBA,
+        "in": TokenType.IN,
         "kaso": TokenType.KASO,
         "piliin": TokenType.PILIIN,
         "cons": TokenType.CONS
@@ -649,7 +650,7 @@ if __name__ == "__main__":
     oomali Flag = oongani;
     numero _var = 5;
 
-    kungz (X > 5) {
+    kung (X > 5) {
         print("x is greater");
     } ediwow {
         print("x is smaller");
