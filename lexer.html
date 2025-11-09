@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MaluPython Lexical Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-50 p-8">
+    <div class="max-w-7xl mx-auto">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">MaluPython Lexical Analyzer</h1>
+            <p class="text-gray-600">Tokenize your MaluPython code using GOTO Method (Finite Automaton)</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center mb-4">
+                    <span class="text-lg font-semibold text-gray-700">Source Code</span>
+                </div>
+                <textarea
+                    id="sourceCode"
+                    class="w-full h-96 p-4 border border-gray-300 rounded font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter your MaluPython code here...">!>> Sample MaluPython Program
+anoboi() {
+    numero x = 10;
+    lutang pi = 3.14;
+    teksto name = "Juan";
+    oomali flag = oongani;
+    
+    kung (x > 5) {
+        print("x is greater");
+    } ediwow {
+        print("x is smaller");
+    }
+    
+    magbalik x;
+}</textarea>
+                <button
+                    onclick="analyzeCode()"
+                    class="mt-4 w-full bg-blue-600 text-white py-3 rounded font-medium hover:bg-blue-700 transition">
+                    Analyze Code
+                </button>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-lg font-semibold text-gray-700">Lexical Analysis Output</span>
+                    <span id="tokenCount" class="text-sm text-gray-500">0 tokens</span>
+                </div>
+                
+                <div class="border border-gray-300 rounded overflow-hidden">
+                    <div class="overflow-y-auto" style="max-height: 400px;">
+                        <table class="w-full">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">LEXEME</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">TOKEN</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-700">POSITION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tokenTable">
+                                <tr>
+                                    <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                                        Click "Analyze Code" to tokenize
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="errorStatus" class="mt-4 p-3 rounded hidden">
+                    <div class="flex items-start">
+                        <span id="errorMessage" class="text-sm font-medium"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TokenType = {
+            NUMERO: "numero",
+            LUTANG: "lutang",
+            TEKSTO: "teksto",
+            OOMALI: "oomali",
+            TROPA: "tropa",
+            SAKLAW: "saklaw",
+            GRUPO: "grupo",
+            IMBENTO: "imbento",
+            ARAYKO: "arayko",
+            KUNG: "kung",
+            KUNGDIMAN: "kungdiman",
+            EDIWOW: "ediwow",
+            ETOSAYO: "etosayo",
+            LOOPIT: "loopit",
+            DO: "do",
+            AWAT: "awat",
+            OSIGE: "osige",
+            MAGBALIK: "magbalik",
+            AND: "AND",
+            OR: "OR",
+            NOT: "NOT",
+            OONGANI: "oongani",
+            MALINGANI: "malingani",
+            ALAWS: "alaws",
+            INPUT: "input",
+            PRINT: "print",
+            ANOBOI: "anoboi",
+            IBA: "iba",
+            IN: "in",
+            KASO: "kaso",
+            PILIIN: "piliin",
+            CONS: "cons",
+            PLUS: "+",
+            MINUS: "-",
+            MULTIPLY: "*",
+            POWER: "**",
+            DIVIDE: "/",
+            FLOOR_DIV: "//",
+            MODULO: "%",
+            EQUAL: "==",
+            NOT_EQUAL: "!=",
+            GREATER: ">",
+            LESS: "<",
+            GREATER_EQUAL: ">=",
+            LESS_EQUAL: "<=",
+            ASSIGN: "=",
+            PLUS_ASSIGN: "+=",
+            MINUS_ASSIGN: "-=",
+            MULTIPLY_ASSIGN: "*=",
+            DIVIDE_ASSIGN: "/=",
+            FLOOR_DIV_ASSIGN: "//=",
+            MODULO_ASSIGN: "%=",
+            POWER_ASSIGN: "**=",
+            LPAREN: "(",
+            RPAREN: ")",
+            LBRACKET: "[",
+            RBRACKET: "]",
+            LBRACE: "{",
+            RBRACE: "}",
+            DOT: ".",
+            COMMA: ",",
+            SEMICOLON: ";",
+            COLON: ":",
+            NUMERO_LIT: "numero_literal",
+            LUTANG_LIT: "lutang_literal",
+            TEKSTO_LIT: "teksto_literal",
+            OOMALI_LIT: "oomali_literal",
+            IDENTIFIER: "identifier",
+            SINGLE_COMMENT: "single_comment",
+            MULTI_COMMENT: "multi_comment",
+            EOF: "eof",
+            ERROR: "error"
+        };
+
+        const State = {
+            START: 0,
+            IN_IDENTIFIER: 1,
+            IN_NUMBER: 2,
+            IN_FLOAT: 3,
+            IN_STRING_DOUBLE: 4,
+            IN_STRING_SINGLE: 5,
+            IN_STRING_ESCAPE: 6,
+            IN_COMMENT_MULTI: 8,
+            IN_LESS: 10,
+            IN_GREATER: 11,
+            IN_EQUAL: 12,
+            IN_BANG: 13,
+            IN_PLUS: 14,
+            IN_MINUS: 15,
+            IN_STAR: 16,
+            IN_SLASH: 17,
+            IN_PERCENT: 18,
+            IN_COMMENT_MULTI_END1: 19,
+            IN_COMMENT_MULTI_END2: 20,
+            ACCEPT: 99,
+            ERROR: -1
+        };
+
+        class LexicalAnalyzer {
+            constructor(source) {
+                this.source = source;
+                this.position = 0;
+                this.line = 1;
+                this.column = 1;
+                this.tokens = [];
+                this.RESERVED_WORDS = {
+                    "numero": TokenType.NUMERO,
+                    "lutang": TokenType.LUTANG,
+                    "teksto": TokenType.TEKSTO,
+                    "oomali": TokenType.OOMALI,
+                    "tropa": TokenType.TROPA,
+                    "saklaw": TokenType.SAKLAW,
+                    "grupo": TokenType.GRUPO,
+                    "imbento": TokenType.IMBENTO,
+                    "arayko": TokenType.ARAYKO,
+                    "kung": TokenType.KUNG,
+                    "kungdiman": TokenType.KUNGDIMAN,
+                    "ediwow": TokenType.EDIWOW,
+                    "etosayo": TokenType.ETOSAYO,
+                    "loopit": TokenType.LOOPIT,
+                    "do": TokenType.DO,
+                    "awat": TokenType.AWAT,
+                    "osige": TokenType.OSIGE,
+                    "magbalik": TokenType.MAGBALIK,
+                    "AND": TokenType.AND,
+                    "OR": TokenType.OR,
+                    "NOT": TokenType.NOT,
+                    "oongani": TokenType.OONGANI,
+                    "malingani": TokenType.MALINGANI,
+                    "alaws": TokenType.ALAWS,
+                    "input": TokenType.INPUT,
+                    "print": TokenType.PRINT,
+                    "anoboi": TokenType.ANOBOI,
+                    "iba": TokenType.IBA,
+                    "in": TokenType.IN,
+                    "kaso": TokenType.KASO,
+                    "piliin": TokenType.PILIIN,
+                    "cons": TokenType.CONS
+                };
+            }
+
+            currentChar() {
+                return this.position < this.source.length ? this.source[this.position] : null;
+            }
+
+            peek(offset = 1) {
+                const pos = this.position + offset;
+                return pos < this.source.length ? this.source[pos] : null;
+            }
+
+            advance() {
+                if (this.position < this.source.length) {
+                    if (this.source[this.position] === '\n') {
+                        this.line += 1;
+                        this.column = 1;
+                    } else {
+                        this.column += 1;
+                    }
+                    this.position += 1;
+                }
+            }
+
+            getNextToken() {
+                let state = State.START;
+                let lexeme = "";
+                let startLine = this.line;
+                let startCol = this.column;
+                let tokenType = null;
+                let stringQuote = null;
+
+                while (true) {
+                    const char = this.currentChar();
+
+                    if (state === State.START) {
+                        if (char === ' ' || char === '\t' || char === '\r') {
+                            this.advance();
+                            startCol = this.column;
+                            continue;
+                        }
+
+                        if (char === '\n') {
+                            this.advance();
+                            startLine = this.line;
+                            startCol = this.column;
+                            continue;
+                        }
+
+                        if (char === null) {
+                            return { type: TokenType.EOF, value: '', line: this.line, column: this.column };
+                        }
+
+                        if ((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || char === '_') {
+                            state = State.IN_IDENTIFIER;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char >= '0' && char <= '9') {
+                            state = State.IN_NUMBER;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '"') {
+                            state = State.IN_STRING_DOUBLE;
+                            stringQuote = '"';
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === "'") {
+                            state = State.IN_STRING_SINGLE;
+                            stringQuote = "'";
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '!') {
+                            state = State.IN_BANG;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '>') {
+                            state = State.IN_GREATER;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '<') {
+                            state = State.IN_LESS;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '=') {
+                            state = State.IN_EQUAL;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '+') {
+                            state = State.IN_PLUS;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '-') {
+                            state = State.IN_MINUS;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '*') {
+                            state = State.IN_STAR;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '/') {
+                            state = State.IN_SLASH;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        if (char === '%') {
+                            state = State.IN_PERCENT;
+                            lexeme += char;
+                            this.advance();
+                            continue;
+                        }
+
+                        const singleChar = {
+                            '(': TokenType.LPAREN,
+                            ')': TokenType.RPAREN,
+                            '[': TokenType.LBRACKET,
+                            ']': TokenType.RBRACKET,
+                            '{': TokenType.LBRACE,
+                            '}': TokenType.RBRACE,
+                            '.': TokenType.DOT,
+                            ',': TokenType.COMMA,
+                            ';': TokenType.SEMICOLON,
+                            ':': TokenType.COLON
+                        };
+
+                        if (char in singleChar) {
+                            tokenType = singleChar[char];
+                            lexeme = char;
+                            this.advance();
+                            state = State.ACCEPT;
+                            continue;
+                        }
+
+                        state = State.ERROR;
+                        lexeme = char;
+                        this.advance();
+                        continue;
+                    }
+
+                    else if (state === State.IN_IDENTIFIER) {
+                        if (char && ((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char === '_') && lexeme.length < 15) {
+                            lexeme += char;
+                            this.advance();
+                        } else {
+                            tokenType = this.RESERVED_WORDS[lexeme] || TokenType.IDENTIFIER;
+                            if (lexeme === "oongani" || lexeme === "malingani") {
+                                tokenType = TokenType.OOMALI_LIT;
+                            }
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_NUMBER) {
+                        if (char && char >= '0' && char <= '9') {
+                            lexeme += char;
+                            this.advance();
+                        } else if (char === '.' && this.peek() && this.peek() >= '0' && this.peek() <= '9') {
+                            state = State.IN_FLOAT;
+                            lexeme += char;
+                            this.advance();
+                        } else {
+                            tokenType = TokenType.NUMERO_LIT;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_FLOAT) {
+                        if (char && char >= '0' && char <= '9') {
+                            lexeme += char;
+                            this.advance();
+                        } else {
+                            tokenType = TokenType.LUTANG_LIT;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_STRING_DOUBLE) {
+                        if (char === null) {
+                            tokenType = TokenType.ERROR;
+                            state = State.ACCEPT;
+                        } else if (char === '\\') {
+                            state = State.IN_STRING_ESCAPE;
+                            this.advance();
+                        } else if (char === '"') {
+                            tokenType = TokenType.TEKSTO_LIT;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else {
+                            lexeme += char;
+                            this.advance();
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_STRING_SINGLE) {
+                        if (char === null) {
+                            tokenType = TokenType.ERROR;
+                            state = State.ACCEPT;
+                        } else if (char === '\\') {
+                            state = State.IN_STRING_ESCAPE;
+                            this.advance();
+                        } else if (char === "'") {
+                            tokenType = TokenType.TEKSTO_LIT;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else {
+                            lexeme += char;
+                            this.advance();
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_STRING_ESCAPE) {
+                        if (char === 'n' || char === 't' || char === '\\' || char === '{' || char === '}' || char === '"' || char === "'") {
+                            lexeme += '\\' + char;
+                        } else {
+                            lexeme += '\\';
+                        }
+                        this.advance();
+                        state = stringQuote === '"' ? State.IN_STRING_DOUBLE : State.IN_STRING_SINGLE;
+                        continue;
+                    }
+
+                    else if (state === State.IN_BANG) {
+                        if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.NOT_EQUAL;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else if (char === '>' && this.peek() === '>') {
+                            this.advance();
+                            this.advance();
+                            lexeme = "";
+                            while (this.currentChar() && this.currentChar() !== '\n') {
+                                lexeme += this.currentChar();
+                                this.advance();
+                            }
+                            tokenType = TokenType.SINGLE_COMMENT;
+                            state = State.ACCEPT;
+                        } else {
+                            tokenType = TokenType.ERROR;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_GREATER) {
+                        if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.GREATER_EQUAL;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else if (char === '>' && this.peek() === '>') {
+                            this.advance();
+                            this.advance();
+                            lexeme = "";
+                            state = State.IN_COMMENT_MULTI;
+                        } else {
+                            tokenType = TokenType.GREATER;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_COMMENT_MULTI) {
+                        if (char === null) {
+                            tokenType = TokenType.MULTI_COMMENT;
+                            state = State.ACCEPT;
+                        } else if (char === '<') {
+                            state = State.IN_COMMENT_MULTI_END1;
+                            this.advance();
+                        } else {
+                            lexeme += char;
+                            this.advance();
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_COMMENT_MULTI_END1) {
+                        if (char === '<') {
+                            state = State.IN_COMMENT_MULTI_END2;
+                            this.advance();
+                        } else {
+                            lexeme += '<' + (char || '');
+                            if (char) this.advance();
+                            state = State.IN_COMMENT_MULTI;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_COMMENT_MULTI_END2) {
+                        if (char === '<') {
+                            this.advance();
+                            tokenType = TokenType.MULTI_COMMENT;
+                            state = State.ACCEPT;
+                        } else {
+                            lexeme += '<<' + (char || '');
+                            if (char) this.advance();
+                            state = State.IN_COMMENT_MULTI;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_LESS) {
+                        if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.LESS_EQUAL;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else {
+                            tokenType = TokenType.LESS;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_EQUAL) {
+                        if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.EQUAL;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else {
+                            tokenType = TokenType.ASSIGN;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_PLUS) {
+                        if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.PLUS_ASSIGN;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else {
+                            tokenType = TokenType.PLUS;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_MINUS) {
+                        if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.MINUS_ASSIGN;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else if (char && char >= '0' && char <= '9') {
+                            lexeme += char;
+                            this.advance();
+                            state = State.IN_NUMBER;
+                        } else {
+                            tokenType = TokenType.MINUS;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_STAR) {
+                        if (char === '*') {
+                            lexeme += char;
+                            this.advance();
+                            if (this.currentChar() === '=') {
+                                lexeme += '=';
+                                tokenType = TokenType.POWER_ASSIGN;
+                                this.advance();
+                            } else {
+                                tokenType = TokenType.POWER;
+                            }
+                            state = State.ACCEPT;
+                        } else if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.MULTIPLY_ASSIGN;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else {
+                            tokenType = TokenType.MULTIPLY;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_SLASH) {
+                        if (char === '/') {
+                            lexeme += char;
+                            this.advance();
+                            if (this.currentChar() === '=') {
+                                lexeme += '=';
+                                tokenType = TokenType.FLOOR_DIV_ASSIGN;
+                                this.advance();
+                            } else {
+                                tokenType = TokenType.FLOOR_DIV;
+                            }
+                            state = State.ACCEPT;
+                        } else if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.DIVIDE_ASSIGN;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else {
+                            tokenType = TokenType.DIVIDE;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.IN_PERCENT) {
+                        if (char === '=') {
+                            lexeme += char;
+                            tokenType = TokenType.MODULO_ASSIGN;
+                            this.advance();
+                            state = State.ACCEPT;
+                        } else {
+                            tokenType = TokenType.MODULO;
+                            state = State.ACCEPT;
+                        }
+                        continue;
+                    }
+
+                    else if (state === State.ACCEPT) {
+                        return {
+                            type: tokenType,
+                            value: (tokenType === TokenType.SINGLE_COMMENT || tokenType === TokenType.MULTI_COMMENT) ? lexeme.trim() : lexeme,
+                            line: startLine,
+                            column: startCol
+                        };
+                    }
+
+                    else if (state === State.ERROR) {
+                        return {
+                            type: TokenType.ERROR,
+                            value: lexeme,
+                            line: startLine,
+                            column: startCol
+                        };
+                    }
+                }
+            }
+
+            tokenize() {
+                this.tokens = [];
+                while (true) {
+                    const token = this.getNextToken();
+                    this.tokens.push(token);
+                    if (token.type === TokenType.EOF) break;
+                }
+                return this.tokens;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function analyzeCode() {
+            const sourceCode = document.getElementById('sourceCode').value;
+            const lexer = new LexicalAnalyzer(sourceCode);
+            const result = lexer.tokenize();
+            const tokens = result.filter(t => t.type !== TokenType.EOF && 
+                                              t.type !== TokenType.SINGLE_COMMENT && 
+                                              t.type !== TokenType.MULTI_COMMENT);
+            
+            // Check for invalid semicolon placement (after closing braces at program end)
+            for (let i = 0; i < tokens.length; i++) {
+                const token = tokens[i];
+                const nextToken = tokens[i + 1];
+                
+                // If we find a closing brace followed by semicolon (invalid as program terminator)
+                if (token.type === TokenType.RBRACE && nextToken && nextToken.type === TokenType.SEMICOLON) {
+                    // Check if this is at the end of the program (no more significant tokens after)
+                    let hasMoreCode = false;
+                    for (let j = i + 2; j < tokens.length; j++) {
+                        if (tokens[j].type !== TokenType.SINGLE_COMMENT && 
+                            tokens[j].type !== TokenType.MULTI_COMMENT) {
+                            hasMoreCode = true;
+                            break;
+                        }
+                    }
+                    
+                    // If no more code after }, mark the semicolon as error
+                    if (!hasMoreCode) {
+                        nextToken.type = TokenType.ERROR;
+                        nextToken.errorReason = "Invalid program terminator - semicolons are for statements only";
+                    }
+                }
+            }
+            
+            const hasError = result.some(t => t.type === TokenType.ERROR);
+
+            // Re-filter to show all tokens including comments for display
+            const displayTokens = result.filter(t => t.type !== TokenType.EOF);
+            
+            document.getElementById('tokenCount').textContent = displayTokens.length + ' tokens';
+
+            const tableBody = document.getElementById('tokenTable');
+            tableBody.innerHTML = '';
+
+            if (displayTokens.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                            No tokens found
+                        </td>
+                    </tr>
+                `;
+            } else {
+                displayTokens.forEach(token => {
+                    const row = document.createElement('tr');
+                    row.className = `border-t ${token.type === TokenType.ERROR ? 'bg-red-50' : 'hover:bg-gray-50'}`;
+                    row.innerHTML = `
+                        <td class="px-4 py-2 text-sm font-mono">${escapeHtml(token.value)}</td>
+                        <td class="px-4 py-2 text-sm ${token.type === TokenType.ERROR ? 'text-red-600 font-semibold' : 'text-blue-600'}">${escapeHtml(token.type)}</td>
+                        <td class="px-4 py-2 text-sm text-gray-600">${token.line}:${token.column}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            const errorStatus = document.getElementById('errorStatus');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            if (displayTokens.length > 0) {
+                errorStatus.classList.remove('hidden');
+                if (hasError) {
+                    errorStatus.style.backgroundColor = '#FEF2F2';
+                    errorMessage.style.color = '#991B1B';
+                    errorMessage.textContent = '⚠ Lexical Errors: Unknown or invalid tokens detected';
+                } else {
+                    errorStatus.style.backgroundColor = '#F0FDF4';
+                    errorMessage.style.color = '#166534';
+                    errorMessage.textContent = '✓ Error: (Lexical error free - no error)';
+                }
+            } else {
+                errorStatus.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
